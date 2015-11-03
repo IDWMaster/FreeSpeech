@@ -1,0 +1,58 @@
+?#
+/*
+The below line of text specifies a layout page. A layout page is used as a sort of "template" for the current page.
+Parameters can be passed to the layout page, which will appear in the layout page's context.page variable.
+*/
+#?
+?#layout('layout.html',{title:'Home'})#?
+<h1>Hello NSA! The current date/time is ?#Date()#?</h1>
+<hr />
+Your current IP address is ?#context.request.client.remoteAddress#?
+<br />
+?#
+//The line below is an include tag, which will insert the pre-processed HTML of the specified page directly into this document.
+#?
+?#include('includesample.html')#?
+<br />This is text below the included HTML file.
+
+
+
+?#
+//The out function can be used to print text at a specified location on the page.
+for(var i = 0;i<=10;i++) {
+out('<br />'+i);
+}
+#?
+
+
+
+?#
+
+//This script is an example of asynchronous command execution.
+
+var promise = new Promise();
+
+var httpclient = require('request');
+var stream = require('stream');
+
+var request = httpclient({uri:'http://google.com'});
+var transformStream = new stream.Writable();
+var html = '';
+transformStream._write = function(data,encoding,callback){
+	html+=data.toString();
+	callback();
+	return true;
+};
+request.pipe(transformStream);
+request.on('end',function(){
+	//Fullfill promise
+	promise.post(html);
+});
+
+request.on('error',function(msg){
+	promise.post(JSON.stringify(msg));
+});
+
+//Run request asynchronously; must be last line of code.
+runasync(promise);
+#?

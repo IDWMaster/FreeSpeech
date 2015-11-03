@@ -1,0 +1,15 @@
+{
+  "name": "testwebsite",
+  "version": "1.0.0",
+  "description": "A test site",
+  "main": "main.js",
+  "dependencies":{
+	  "openserver":">= 0.0.1",
+	  "request":">= 1.0"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Brian Bosak <brielcccc@gmail.com> (https://github.com/IDWMaster)",
+  "license": "GPL-3.0"
+}
