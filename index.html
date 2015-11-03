@@ -19,8 +19,9 @@ Your current IP address is ?#context.request.client.remoteAddress#?
 
 ?#
 //The out function can be used to print text at a specified location on the page.
-for(var i = 0;i<=10;i++) {
-out('<br />'+i);
+var qs = context.request.queryString;
+for(var i in qs) {
+	out('<br />'+i+' = '+qs[i]);
 }
 #?
 
