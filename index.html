@@ -7,7 +7,7 @@ Parameters can be passed to the layout page, which will appear in the layout pag
 ?#layout('layout.html',{title:'Home'})#?
 <h1>Hello NSA! The current date/time is ?#Date()#?</h1>
 <hr />
-Your current IP address is ?#context.request.client.remoteAddress#?
+Your current IP address is ?#context.request.remoteHost#?
 <br />
 ?#
 //The line below is an include tag, which will insert the pre-processed HTML of the specified page directly into this document.
