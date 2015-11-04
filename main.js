@@ -1,5 +1,5 @@
 var httpserver = require('openserver');
-
+var Stream = require('stream');
 
 var datamodel = {
 		pages:{'Home page':'/','Async request demo':'/asyncdemo','Contact us':'/contact'}
@@ -10,15 +10,10 @@ var datamodel = {
 
 var server = httpserver.startServer({ip:'::',port:8080});
 
-library('lib/simpleweb.js');
+var SimpleWeb = server.loadLibrary('lib/simpleweb.js');
 
 
-var testform = new SimpleWeb.Form();
-testform.addControl(new SimpleWeb.HTMLElement('input').setAttribute('id','firstname').setAttribute('placeholder','Enter your first name'),'First name');
-testform.addControl(new SimpleWeb.HTMLElement('input').setAttribute('id','lastname').setAttribute('placeholder','Enter your last name'),'Last name');
 
-
-datamodel.testform = testform;
 
 server.RegPath('/', function(request,response){
 	server.setModel(datamodel);
@@ -29,6 +24,12 @@ server.RegPath('/asyncdemo',function(request,response){
 	response.respondWithHtml('asyncdemo.html');
 });
 server.RegPath('/contact',function(request,response){
+	
+	
+	var contactForm = new SimpleWeb.Form(server);
+	var firstName = contactForm.addTextControl('First name','Enter your first name');
+	var lastName = contactForm.addTextControl('Last name','Enter your last name');
+	datamodel.testform = contactForm;
 	server.setModel(datamodel);
 	response.respondWithHtml('contact.html');
 });
