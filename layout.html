@@ -1,8 +1,17 @@
+?#
+//Project variables
+context.websiteName = 'OpenServer example site';
+
+undefined
+#?
 <html>
 <head>
 <title>Test website -- ?#context.page.title#?</title>
+?#include('Content/Bootstrap/include.html')#?
 </head>
-<body>
+<body style="margin-top:90px;">
+?#include('Content/Bootstrap/menu.html')#?
+
 ?#context.renderBody()#?
 </body>
 </html>
