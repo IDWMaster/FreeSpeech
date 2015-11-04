@@ -1,0 +1,37 @@
+?#layout('layout.html',{title:'Async example'})#?
+
+<pre>
+?#
+
+
+//This script is an example of asynchronous command execution.
+
+var promise = new Promise();
+
+var httpclient = require('request');
+var stream = require('stream');
+
+var request = httpclient({uri:'https://raw.githubusercontent.com/IDWMaster/GGSuite/master/src/GGDNS.cpp'});
+var transformStream = new stream.Writable();
+var html = '';
+transformStream._write = function(data,encoding,callback){
+	html+=data.toString();
+	callback();
+	return true;
+};
+request.pipe(transformStream);
+request.on('end',function(){
+	//Fullfill promise
+	promise.post(html);
+});
+
+request.on('error',function(msg){
+	promise.post(JSON.stringify(msg));
+});
+
+//Run request asynchronously; must be last line of code.
+runasync(promise);
+
+
+#?
+</pre>
