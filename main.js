@@ -12,7 +12,9 @@ var server = httpserver.startServer({ip:'::',port:8080});
 
 var SimpleWeb = server.loadLibrary('lib/simpleweb.js');
 
-
+server.RegPath('/basetest',function(request,response){
+	response.respond('This page can be used as a baseline performance test.');
+});
 
 
 server.RegPath('/', function(request,response){
