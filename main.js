@@ -32,6 +32,11 @@ server.RegPath('/contact',function(request,response){
 	var firstName = contactForm.addTextControl('First name','Enter your first name');
 	var lastName = contactForm.addTextControl('Last name','Enter your last name');
 	datamodel.testform = contactForm;
+	contactForm.getData(function(formdata){
+		
+	});
+	//datamodel.formdata = formdata;
 	server.setModel(datamodel);
 	response.respondWithHtml('contact.html');
+	
 });
