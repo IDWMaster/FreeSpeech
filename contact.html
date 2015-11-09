@@ -4,3 +4,10 @@
 <hr />
 
 ?#context.model.testform#?
+
+
+?#
+if(context.model.firstName) {
+	out('<br />Hello, '+context.model.firstName+' '+context.model.lastName);
+}
+#?
