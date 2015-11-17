@@ -1,14 +1,18 @@
-?#layout('layout.html',{title:'Home'})#?
-<h1>Hello NSA! The current date/time is ?#Date()#?</h1>
-<hr />
-Your current IP address is ?#context.request.remoteHost#?
+?#layout('layout.html',{title:'Connect'})#?
 
-<h2>How do I embed this template on my own website?</h2>
+<h2>Free Speech Network -- Important Security Notice</h2>
 <hr />
-To embed this in your own website; simply fork us on GitHub, and start building your project!
-To update this template; simply pull from our upstream repository!
-
-
-<h2>Do you accept pull requests?</h2>
-<hr />
-Yes; send us the pull request on GitHub and we will review it.
+For best security practices; when running this application, we strongly recommend that you take the following precautions
+<ul>
+<li>View this site in Incognito Mode, Safe Browsing mode, or equivalent to ensure that communications content does not get saved to your hard drive or is shared with third parties unintentionally.</li>
+<li>Close all other running applications -- some applications may contain backdoors or security vulnerabilities that could expose your communications, and jeopardize the security of your network connection.</li>
+<li>Use full-disk encryption, and use a strong password to encrypt your drive. This will prevent your identity from becoming compromised in the event that your computer or hard drive is stolen.</li>
+<li>If possible; configure your firewall to disable all TCP traffic. This application does not make use of TCP, except for communication with localhost (127.0.0.1). To minimize your attack surface, all other network activity should be stopped at the time this application is running.</li>
+<li>Inspect the source code of this software, and other software on your system for vulnerabilities or back doors. This software is written in JavaScript, running on Node.JS, and you should have received the full source code of this application. It is constructed in such a way as to be easily audited. We encourage and <b><u>strongly advise</u></b> every user of this software to conduct an audit of the code that has been downloaded.</li>
+</ul>
+<input type="button" value="Continue" id="continueBtn" />
+<script type="text/javascript">
+document.getElementById('continueBtn').onclick = function(){
+window.location = 'fsos'
+};
+</script>
