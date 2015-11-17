@@ -10,14 +10,14 @@ var dgram = require('dgram');
 var NodeRSA = require('node-rsa');
 
 NodeRSA.prototype.thumbprint = function() {
-	var pubbin = key.exportKey('pkcs8-public-der');
+	var pubbin = this.exportKey('pkcs8-public-der');
 	var hash = crypto.createHash('sha256');
 	hash.update(pubbin);
-	return hash.digest('base64');
+	return hash.digest('hex');
 };
 
 var db;
-
+var defaultKey;
 
 var sid = uuid.v4().toString();
 
@@ -35,20 +35,42 @@ var EncryptionKeys = {
 				return false;
 			}
 			if(doc) {
-				var key = new NodeRSA();
-				key.importKey(doc.key);
+				var key = new NodeRSA();;
+				
+				key.importKey(doc.key.buffer,'pkcs1-der');
 				return callback(key);
 			}else {
 				return callback(null);
 			}
 		});
 	},
-	add:function(key) {
+	getDefaultKey:function(callback){
+		db.collection('keys').find({hasPrivate:true,isDefault:true}).each(function(err,doc){
+			if(!doc) {
+				callback(null);
+				return false;
+			}else {
+				var key = new NodeRSA();
+				key.importKey(doc.key.buffer,'pkcs1-der');
+				return callback(key);
+			}
+		});
+	},
+	add:function(key,callback,isDefault) {
 		var binkey = key.exportKey('pkcs1-der');
 		var doc = {
-				hasPrivate:key.isPrivate(),
-				key:binkey
+				hasPrivate:!key.isPublic(true),
+				key:binkey,
+				thumbprint:key.thumbprint(),
+				isDefault:(isDefault == true)
 		};
+		db.collection('keys').insertOne(doc,function(err,r){
+			if(err) {
+				callback(false);
+			}else {
+				callback(true);
+			}
+		});
 	}
 };
 
@@ -195,7 +217,7 @@ var API = {
 
 var initHttpServer = function() {
 
-	
+	console.log('Your default thumbprint is: '+defaultKey.thumbprint());
 	
 		
 	var server = net.createServer(function(client){});
@@ -298,18 +320,27 @@ fs.mkdir('db', function(){
 					}
 					db = mdb;
 					
-					EncryptionKeys.enumPrivateKeys(function(key){
+					EncryptionKeys.getDefaultKey(function(key){
 						if(!key) {
 							//We need key please
-							console.log('Generating default identity file (key length == 4096 bits)....');
+							console.log('Generating default identity file (key length == 4096 bits), this may take a long time....');
 							var keypair = CryptCreateKeyPair(4096);
 							console.log('Keypair created. Adding to database....');
-							EncryptionKeys.add(keypair);
-							
-						}
+							EncryptionKeys.add(keypair,function(success){
+								if(!success) {
+									throw 'counterclockwise';
+								}
 
-						console.log('Bringing up the frontend....');
-						initHttpServer();
+								console.log('Bringing up the frontend....');
+								defaultKey = keypair;
+								initHttpServer();
+							},true);
+							
+						}else {
+							defaultKey = key;
+							initHttpServer();
+						}
+						return false;
 					});
 					
 				});	
