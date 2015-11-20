@@ -382,6 +382,8 @@ var startServer = function (portno, optionalCallback) {
                     console.log('DEBUG: Session parsed');
                     //Send response to connection
                     var response = new Buffer(16);
+                    //TODO: To prevent replay attacks, the first four bytes in this frame should match the random data
+                    //in the initial handshake request.
                     crypto.randomBytes(4,function(er,buff){
                         buff.copy(response);
                         response[4] = 1;
