@@ -20,6 +20,13 @@ var NodeRSA = require('node-rsa');
 
 var UDPClient;
 
+
+/**
+ * Encrypt using AES encryption
+ * @param {Buffer} key
+ * @param {Buffer} data
+ * @returns {Buffer}
+ */
 var aesEncrypt = function (key, data) {
     var iv = new Buffer(16);
     key.copy(iv);
@@ -27,10 +34,16 @@ var aesEncrypt = function (key, data) {
     var encrypted = Buffer.concat([cipher.update(data), cipher.final()]);
     return encrypted;
 };
+/**
+ * Decrypt using AES encryption
+ * @param {Buffer} key
+ * @param {Buffer} data
+ * @returns {Buffer}
+ */
 var aesDecrypt = function (key, data) {
     var iv = new Buffer(16);
     key.copy(iv);
-    var cipher = crypto.createDecipheriv('aes256-cbc', key,iv);
+    var cipher = crypto.createDecipheriv('aes-256-cbc', key,iv);
     var decrypted = Buffer.concat([cipher.update(data), cipher.final()]);
     return decrypted;
 };
@@ -217,6 +230,18 @@ var Session = function () {
                  */
                 getSessionID:function() {
                     return sessionID;
+                },
+                /**
+                 * Sets the current session ID for a remote session
+                 * @param {Number} remoteID
+                 * @returns {undefined}
+                 */
+                setSessionID:function(remoteID) {
+                    Session.available.push(remoteID);
+                    sessionID = remoteID;
+                    retval.setSessionID = function(id) {
+                        throw 'This function can only be called once.';
+                    };
                 }
     };
     Protected.ntfyPacket = function (packet) {
@@ -321,7 +346,10 @@ var startEncryptedSession = function (parentSocket, publicKey, thumbprint, callb
         var thumbstr = new Buffer(thumbprint, 'utf-8');
         //Note: Buffers are not initialized to all-zeroes; they can be used as a source of non-secure cryptographic pseudo-randomness
         //although we need to be careful about accidentally leaking sensitive data.
+        var recvCBHandle;
+        
         var timeout = setTimeout(function () {
+            parentSocket.unregisterReceiveCallback(recvCBHandle);
             callback(null);
         }, 2000);
         var packet = new Buffer(4 + 1 + thumbstr.length + 1 + 32 + 1);
@@ -331,8 +359,29 @@ var startEncryptedSession = function (parentSocket, publicKey, thumbprint, callb
         packet[4 + 1 + thumbstr.length] = 0;
         rnd.copy(packet, 4 + 1 + thumbstr.length + 1, 4);
         packet[4 + 1 + thumbstr.length + 1 + 32] = 1;
-        parentSocket.registerReceiveCallback(function (data) {
+        var encKey = new Buffer(32);
+        rnd.copy(encKey,0,4);
+        var sessionEstablished = false;
+        var sessionID;
+        recvCBHandle = parentSocket.registerReceiveCallback(function (data) {
+            try {
+            if(sessionEstablished) {
+                //TODO: Process (potentially) multi-frame packet
+                
+            }else {
+                var packet = aesDecrypt(encKey,data);
+                if(packet.readUInt32LE(0) == rnd.readUInt32LE(0)) {
+                    if(packet[4] == 1) {
+                      sessionID = packet.readUInt16LE(4+1); 
+                        clearTimeout(timeout);
+                        callback(retval);
+                      sessionEstablished = true;
+                    }
+                }
+            }
+        }catch(er) {
             
+        }
         });
         //TODO: Encrypt before sending
         var key = new Buffer(32);
@@ -374,6 +423,7 @@ var startServer = function (portno, optionalCallback) {
                         }
                         thumbprint += packet[i];
                     }
+                    i++;
                     //Get AES session key, and create crypto object for it
                     var aeskey = new Buffer(32);
                     packet.copy(aeskey, 0, i, i + 32);
@@ -384,14 +434,13 @@ var startServer = function (portno, optionalCallback) {
                     var response = new Buffer(16);
                     //TODO: To prevent replay attacks, the first four bytes in this frame should match the random data
                     //in the initial handshake request.
-                    crypto.randomBytes(4,function(er,buff){
-                        buff.copy(response);
+                        packet.copy(response,0,0,4);
                         response[4] = 1;
                         response.writeUInt16LE(session.getSessionID(),4+1);
                         //TODO: Optional IP and port numbers
                         console.log('DEBUG TODO add IP and port numbers here');
                         session.send(aesEncrypt(session.key,response));
-                    });
+                    
                 }
             } catch (er) {
                 console.log('DEBUG SESSION ERR: '+er);
