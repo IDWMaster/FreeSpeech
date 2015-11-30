@@ -189,7 +189,13 @@ var Session = function () {
     }
     
     var callbacks = new Array();
-
+    
+    
+    
+    var reassemblyBuffer = new Object();
+    
+    var currentPacketID = 0;
+    
     var Protected = {};
     var retval = {
         send: function (data) {},
@@ -222,7 +228,69 @@ var Session = function () {
                  */
                 sendPacket:function(data) {
                     //TODO: Encode in general packet format
-                    throw 'Not Yet implemented TODO';
+                    var packetOffset = 0;
+                    var mlen = Math.min(data.length-packetOffset,4096);
+                        var i = 0;
+                    while(data.length-packetOffset>0) {
+                        
+                        var send = function(packet,i) {
+                        var buffy = new Buffer(4+1+2+2+4+packet.length);
+                            buffy.writeUInt32LE(currentPacketID,0);
+                            buffy[4] = 2;
+                            buffy.writeUInt16LE(sessionID,4+1);
+                            buffy.writeUInt16LE(i,4+1+2);
+                            buffy.writeUInt32LE(packet.length,4+1+2+2);
+                            packet.copy(buffy,4+1+2+2+4);
+                            retval.send(buffy);
+                       
+                    };
+                    var mb = new Buffer(mlen);
+                    data.copy(mb,0,0,mlen);
+                    send(mb,i);
+                        packetOffset+=mlen;
+                        i++;
+                    }
+                    
+                        currentPacketID++;
+                },
+                /**
+                 * Decodes a packet
+                 * @param {Buffer} data
+                 * @returns {undefined}
+                 */
+                decodePacket:function(data) {
+                    try {
+                    if(data[4] == 2) {
+                        var messageID = data.readUInt32LE(0);
+                        var _sessionID = data.readUInt16LE(4+1);
+                        var packetID = data.readUInt16LE(4+1+2);
+                        if(sessionID != _sessionID) {
+                            return;
+                        }
+                        var dlen = data.readUInt32LE(4+1+2+2);
+                        if(!reassemblyBuffer[messageID]) {
+                            var mray = new Array(Math.ceil(dlen/4096));
+                            mray.buffer = new Buffer(dlen);
+                            mray.currentLength = 0;
+                            reassemblyBuffer[messageID] = mray;
+                        }
+                        var cBuffer = reassemblyBuffer[messageID];
+                        if(cBuffer[packetID]) {
+                            return;
+                        }
+                        var dSegLen = Math.min(dlen-cBuffer.currentLength,data.length-(4+1+2+2));
+                        cBuffer.currentLength+=dSegLen;
+                        cBuffer[packetID] = true;
+                        data.copy(cBuffer.buffer,4096*packetID,4+1+2+2+4,4+1+2+2+4+dSegLen);
+                        if(cBuffer.currentLength >= dlen) {
+                            //We have a packet!
+                            reassemblyBuffer[messageID] = null;
+                            Protected.ntfyPacket(cBuffer.buffer);
+                        }
+                    }
+                }catch(er) {
+                    
+                }
                 },
                 /**
                  * Gets the current session identifier
@@ -253,6 +321,51 @@ var Session = function () {
 };
 Session.CID = 0;
 Session.available = new Array();
+
+
+/**
+ * Call this function after a session has been successfully established
+ * @param {Session} session
+ * @returns {undefined}
+ */
+var sessionInit = function(session) {
+    session.registerReceiveCallback(function(data){
+        
+    console.log('DEBUG: Received encrypted packet');
+        try {
+            switch(data[0]) {
+                case 0:
+                    //Request public key for fingerprint
+                    break;
+                case 1:
+                    //Send public key
+                    break;
+                case 2:
+                    //Connect to node with specified fingerprint
+                    break;
+                case 3:
+                    //Response to request to open encrypted session
+                    break;
+                case 4:
+                    //Send raw packet to node
+                    break;
+                case 5:
+                    //Ping request
+                    console.log('DEBUG: Received ping request');
+                    session.sendPacket(new Buffer([6]));
+                    break;
+                case 6:
+                    //Ping response
+                    console.log('DEBUG: Peer has responded to ping request');
+                    break;
+            }
+        }catch(er) {
+        }
+    });
+    
+    //Send ping
+    session.sendPacket(new Buffer([5]));
+}
 
 
 
@@ -366,21 +479,31 @@ var startEncryptedSession = function (parentSocket, publicKey, thumbprint, callb
         recvCBHandle = parentSocket.registerReceiveCallback(function (data) {
             try {
             if(sessionEstablished) {
-                //TODO: Process (potentially) multi-frame packet
-                
+                data = aesDecrypt(encKey,data);
+                retval.decodePacket(data);
             }else {
                 var packet = aesDecrypt(encKey,data);
                 if(packet.readUInt32LE(0) == rnd.readUInt32LE(0)) {
                     if(packet[4] == 1) {
-                      sessionID = packet.readUInt16LE(4+1); 
+                      sessionID = packet.readUInt16LE(4+1);
+                      retval.setSessionID(sessionID);
                         clearTimeout(timeout);
                         callback(retval);
                       sessionEstablished = true;
+                      var _send = retval.send;
+                            retval.send = function(packet) {
+                          _send(packet);
+                          var alignedBuffer = new Buffer(Math.ceil(packet.length/16)*16);
+                          packet.copy(alignedBuffer);
+                              
+                          parentSocket.send(aesEncrypt(encKey,alignedBuffer));
+                      };
+                            sessionInit(retval);
                     }
                 }
             }
         }catch(er) {
-            
+            console.log('DEBUG: Session server error '+er);
         }
         });
         //TODO: Encrypt before sending
@@ -403,11 +526,27 @@ var startServer = function (portno, optionalCallback) {
         }
     }, function (session) {
         console.log('DEBUG: Session start');
+        var encryptedSession = Session();
+            var _send = encryptedSession.send;
+            var _close = encryptedSession.close;
+            encryptedSession.send = function(data) {
+                //Align data buffer
+                _send(data);
+                var alignedBuffer = new Buffer(Math.ceil(data.length/16)*16);
+                data.copy(alignedBuffer);
+                session.send(aesEncrypt(encryptedSession.key,alignedBuffer));
+                
+            };
+            encryptedSession.close = function() {
+                _close();
+            };
+            
         //We have a possible active connection
         session.registerReceiveCallback(function (data) {
             try {
-                if (session.key) {
+                if (encryptedSession.key) {
                     //TODO: Use active session key
+                    encryptedSession.decodePacket(aesDecrypt(encryptedSession.key,data));
                 } else {
                     //Must be addressed to us, decode it
                     var packet = defaultKey.decrypt(data);
@@ -428,7 +567,7 @@ var startServer = function (portno, optionalCallback) {
                     var aeskey = new Buffer(32);
                     packet.copy(aeskey, 0, i, i + 32);
                     var includeIPInformation = packet[i + 32];
-                    session.key = aeskey;
+                    encryptedSession.key = aeskey;
                     console.log('DEBUG: Session parsed');
                     //Send response to connection
                     var response = new Buffer(16);
@@ -436,11 +575,11 @@ var startServer = function (portno, optionalCallback) {
                     //in the initial handshake request.
                         packet.copy(response,0,0,4);
                         response[4] = 1;
-                        response.writeUInt16LE(session.getSessionID(),4+1);
+                        response.writeUInt16LE(encryptedSession.getSessionID(),4+1);
                         //TODO: Optional IP and port numbers
                         console.log('DEBUG TODO add IP and port numbers here');
-                        session.send(aesEncrypt(session.key,response));
-                    
+                        session.send(aesEncrypt(encryptedSession.key,response));
+                        sessionInit(encryptedSession);
                 }
             } catch (er) {
                 console.log('DEBUG SESSION ERR: '+er);
@@ -499,6 +638,10 @@ var initHttpServer = function () {
         loopbackConnection = startEncryptedSession(loopbackConnection, defaultKey, '', function (session) {
             if (!session) {
                 console.log('WARN: Loopback connection failed.');
+            }else {
+                console.log('DEBUG: Loopback connection established');
+                sessionInit(session);
+                
             }
         });
     });
@@ -617,7 +760,6 @@ fs.mkdir('db', function () {
                                 if (!success) {
                                     throw 'counterclockwise';
                                 }
-
                                 console.log('Bringing up the frontend....');
                                 defaultKey = keypair;
                                 initHttpServer();
