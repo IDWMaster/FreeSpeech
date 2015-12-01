@@ -451,12 +451,11 @@ var CleartextServer = function (onReady, onClientConnect, customPort) {
  * @param thumbprint A string containing the thumbprint with which to authenticate, or an empty string for no thumbprint
  * @param callback A callback method which will be invoked when a connection has been successfully established.
  */
-var startEncryptedSession = function (parentSocket, publicKey, thumbprint, callback) {
+var startEncryptedSession = function (parentSocket, publicKey, callback) {
     //TODO: Create encrypted handshake packet
     var retval = Session();
 
     crypto.randomBytes(4 + 32, function (er, rnd) {
-        var thumbstr = new Buffer(thumbprint, 'utf-8');
         //Note: Buffers are not initialized to all-zeroes; they can be used as a source of non-secure cryptographic pseudo-randomness
         //although we need to be careful about accidentally leaking sensitive data.
         var recvCBHandle;
@@ -465,13 +464,11 @@ var startEncryptedSession = function (parentSocket, publicKey, thumbprint, callb
             parentSocket.unregisterReceiveCallback(recvCBHandle);
             callback(null);
         }, 2000);
-        var packet = new Buffer(4 + 1 + thumbstr.length + 1 + 32 + 1);
+        var packet = new Buffer(4 + 1 + 32 + 1);
         rnd.copy(packet, 0, 0, 4);
         packet[4] = 0;
-        thumbstr.copy(packet, 4 + 1);
-        packet[4 + 1 + thumbstr.length] = 0;
-        rnd.copy(packet, 4 + 1 + thumbstr.length + 1, 4);
-        packet[4 + 1 + thumbstr.length + 1 + 32] = 1;
+        rnd.copy(packet, 4 + 1, 4);
+        packet[4 + 1 + 32] = 1;
         var encKey = new Buffer(32);
         rnd.copy(encKey,0,4);
         var sessionEstablished = false;
@@ -554,19 +551,10 @@ var startServer = function (portno, optionalCallback) {
                     if (packet[4] != 0) {
                         throw 'Illegal OPCODE';
                     }
-                    var thumbprint = '';
-                    var i;
-                    for (i = 5; i < packet.length; i++) {
-                        if (packet[i] == 0) {
-                            break;
-                        }
-                        thumbprint += packet[i];
-                    }
-                    i++;
                     //Get AES session key, and create crypto object for it
                     var aeskey = new Buffer(32);
-                    packet.copy(aeskey, 0, i, i + 32);
-                    var includeIPInformation = packet[i + 32];
+                    packet.copy(aeskey, 0, 5, 5 + 32);
+                    var includeIPInformation = packet[5 + 32];
                     encryptedSession.key = aeskey;
                     console.log('DEBUG: Session parsed');
                     //Send response to connection
@@ -635,7 +623,7 @@ var initHttpServer = function () {
     UDPClient = startServer(null, function (portno) {
         var loopbackClient = startServer();
         var loopbackConnection = loopbackClient.connect('127.0.0.1', portno);
-        loopbackConnection = startEncryptedSession(loopbackConnection, defaultKey, '', function (session) {
+        loopbackConnection = startEncryptedSession(loopbackConnection, defaultKey, function (session) {
             if (!session) {
                 console.log('WARN: Loopback connection failed.');
             }else {
