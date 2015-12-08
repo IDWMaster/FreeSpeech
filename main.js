@@ -21,6 +21,7 @@ var uuid = require('node-uuid');
 var dgram = require('dgram');
 var NodeRSA = require('node-rsa');
 var Session = require('freespeech-session').Session;
+var CleartextServer = require('freespeech-session').CleartextServer;
 var UDPClient;
 
 
@@ -226,79 +227,6 @@ var sessionInit = function(session) {
 }
 
 
-
-/**
- * Cleartext server
- */
-var CleartextServer = function (onReady, onClientConnect, customPort) {
-    var activeSessions = new Object();
-
-    var s = dgram.createSocket('udp4');
-    if (customPort) {
-        s.bind(customPort, function () {
-            var portno = s.address().port;
-            onReady(portno);
-        });
-    } else {
-        s.bind(function () {
-            var portno = s.address().port;
-            onReady(portno);
-
-        });
-    }
-
-    s.on('message', function (msg, rinfo) {
-        var entry = rinfo.address + ':' + rinfo.port;
-        
-        if (!activeSessions[entry]) {
-            var session = Session();
-            var send = session.send;
-            var close = session.close;
-            
-            session.subclass(function (_protected) {
-                activeSessions[entry] = function (data) {
-                    _protected.ntfyPacket(data);
-                };
-                session.send = function (data) {
-                    send(data);
-                    s.send(data, 0, data.length, rinfo.port,rinfo.address);
-                    
-                };
-                session.close = function () {
-                    close();
-                    delete activeSessions[entry];
-                };
-            });
-            onClientConnect(session);
-        }
-        activeSessions[entry](msg);
-    });
-
-    return {
-        close: function (callback) {
-            s.close(callback);
-        }, connect: function (remoteAddress, remotePort) {
-            var retval = Session();
-            var entry = remoteAddress + ':' + remotePort;
-            var send = retval.send;
-            var close = retval.close;
-            retval.subclass(function (_protected) {
-                activeSessions[entry] = function (data) {
-                    _protected.ntfyPacket(data);
-                };
-                retval.send = function (data) {
-                    send(data);
-                    s.send(data, 0, data.length, remotePort,remoteAddress);
-                };
-                retval.close = function () {
-                    close();
-                    delete activeSessions[entry];
-                };
-            });
-            return retval;
-        }
-    };
-};
 
 
 
