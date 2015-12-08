@@ -5,10 +5,11 @@
   "main": "main.js",
   "dependencies": {
     "escape-html": "^1.0.3",
-    "mongodb": ">=1.0",
+    "freespeech-session": "^1.0.1",
+    "mongodb": "^2.1.0",
     "node-rsa": "^0.2.26",
     "node-uuid": "^1.4.7",
-    "openserver": "^0.1.0",
+    "openserver": "^0.1.5",
     "request": ">= 1.0"
   },
   "scripts": {
