@@ -21,6 +21,7 @@ CryptDB.onDbReady(function () {
             console.log('Generating a 4096-bit key. This may take some time. Please be patient.');
             defaultKey = CryptLib.generateRSAKey(4096);
             EncryptionKeys.add(defaultKey,function(s){
+                console.log('Added key?');
                 if(!s) {
                     throw 'up';
                 }
@@ -36,5 +37,6 @@ CryptDB.onDbReady(function () {
                 console.log('Session established');
             });
         });
+        return false;
     });
 });
